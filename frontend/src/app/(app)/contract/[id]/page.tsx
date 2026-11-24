@@ -30,6 +30,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+const TTL_DOCS_URL = "https://developers.stellar.org/docs/learn/smart-contract-internals/state-archival";
+
+function TtlBadge({ ttl }: { ttl: number | null | undefined }) {
+  if (ttl == null) return null;
+  if (ttl < 100) {
+    return (
+      <span className="shrink-0 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white">
+        Critical: expires in {ttl.toLocaleString()} ledgers
+      </span>
+    );
+  }
+  if (ttl < 1000) {
+    return (
+      <span className="shrink-0 rounded bg-orange-500 px-2 py-1 text-xs font-semibold text-white">
+        Warning: expires in {ttl.toLocaleString()} ledgers
+      </span>
+    );
+  }
+  return null;
+}
+
 export default async function ContractPage({ params }: Props) {
   const contractId = params.id;
   const info = await getContractInfo(contractId);
@@ -45,6 +66,9 @@ export default async function ContractPage({ params }: Props) {
 
   const wasmSizeKb = wasm?.sizeBytes != null ? wasm.sizeBytes / 1024 : null;
   const resourceLimits = wasm?.resourceLimits ?? null;
+
+  const expirationLedger = info?.expirationLedger ?? null;
+  const ttl = info?.ttl ?? null;
 
   return (
     <div>
@@ -64,6 +88,22 @@ export default async function ContractPage({ params }: Props) {
             WASM: {wasmSizeKb.toFixed(2)} KB
           </span>
         )}
+      </div>
+
+      <div className="mb-8 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-prism-muted">Expiration ledger:</span>
+        <span className="font-mono">
+          {expirationLedger != null ? expirationLedger.toLocaleString() : "—"}
+        </span>
+        <TtlBadge ttl={ttl} />
+        <a
+          href={TTL_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-prism-accent underline hover:no-underline"
+        >
+          Extend TTL
+        </a>
       </div>
 
       <div className="grid grid-cols-1 gap-8">

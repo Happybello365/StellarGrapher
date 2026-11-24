@@ -64,6 +64,24 @@ function extractWasmSize(entry: unknown): number | null {
   return toNumber(wasm?.size ?? wasm?.byteLength);
 }
 
+function extractExpirationLedger(entry: unknown): number | null {
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const contractData = record.contractData as Record<string, unknown> | undefined;
+  const val = (contractData?.val ?? record.val) as Record<string, unknown> | undefined;
+  const executable = val?.executable as Record<string, unknown> | undefined;
+  const wasm = executable?.wasm as Record<string, unknown> | undefined;
+  return toNumber(
+    record.liveUntilLedgerSeq ??
+      record.liveUntilLedger ??
+      record.expirationLedger ??
+      record.expirationLedgerSeq ??
+      contractData?.liveUntilLedgerSeq ??
+      val?.liveUntilLedgerSeq ??
+      wasm?.liveUntilLedgerSeq,
+  );
+}
+
 export async function GET(req: Request, { params }: Params) {
   const limited = rateLimitRequest(req, { scope: "contract-info" });
   if (limited) return limited;
@@ -78,12 +96,14 @@ export async function GET(req: Request, { params }: Params) {
   const entries = Array.isArray(ledgerEntries) ? ledgerEntries : [];
   let wasmSize: number | null = null;
   let resourceLimits: ResourceLimits | null = null;
+  let expirationLedger: number | null = null;
   for (const entry of entries) {
     if (wasmSize === null) wasmSize = extractWasmSize(entry);
     if (resourceLimits === null) resourceLimits = extractResourceLimits(entry);
-    if (wasmSize !== null && resourceLimits !== null) break;
+    if (expirationLedger === null) expirationLedger = extractExpirationLedger(entry);
+    if (wasmSize !== null && resourceLimits !== null && expirationLedger !== null) break;
   }
 
   // Gaps are ledger ranges the indexer skipped for every contract; the UI can flag them.
-  return NextResponse.json({ ...info, historyGaps, wasmSize, resourceLimits });
+  return NextResponse.json({ ...info, historyGaps, wasmSize, resourceLimits, expirationLedger });
 }
