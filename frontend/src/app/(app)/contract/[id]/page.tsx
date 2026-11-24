@@ -8,6 +8,7 @@ import InvokeTool from "@/components/InvokeTool";
 import LiveEventLog from "@/components/LiveEventLog";
 import CopyButton from "@/components/CopyButton";
 import SectionHeader from "@/components/SectionHeader";
+import Breadcrumb from "@/components/Breadcrumb";
 import { EVENT_PAGE_SIZE, INVOCATION_PAGE_SIZE } from "@/lib/contract-lists";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,13 @@ export default async function ContractPage({ params }: Props) {
 
   return (
     <div>
+      <Breadcrumb
+        items={[
+          { label: "Home", href: "/" },
+          { label: "Contracts", href: "/contracts" },
+          { label: contractId },
+        ]}
+      />
       <h1 className="text-2xl font-bold mb-1">Contract</h1>
       <div className="flex items-start gap-2 mb-8">
         <p className="text-prism-muted font-mono text-sm break-all">{contractId}</p>
