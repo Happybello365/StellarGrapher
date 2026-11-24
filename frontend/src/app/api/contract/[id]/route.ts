@@ -7,6 +7,63 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
+interface ResourceLimits {
+  cpuInsns: number | null;
+  memBytes: number | null;
+  ledgerReadBytes: number | null;
+  ledgerWriteBytes: number | null;
+  ledgerReadEntries: number | null;
+  ledgerWriteEntries: number | null;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function extractResourceLimits(entry: unknown): ResourceLimits | null {
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const contractData = record.contractData as Record<string, unknown> | undefined;
+  const val = (contractData?.val ?? record.val) as Record<string, unknown> | undefined;
+  const executable = val?.executable as Record<string, unknown> | undefined;
+  const wasm = executable?.wasm as Record<string, unknown> | undefined;
+  const limits = (wasm?.limits ?? val?.limits ?? record.limits) as Record<string, unknown> | undefined;
+  if (!limits) return null;
+  return {
+    cpuInsns: toNumber(limits.cpuInsns ?? limits.cpu_insns),
+    memBytes: toNumber(limits.memBytes ?? limits.mem_bytes),
+    ledgerReadBytes: toNumber(limits.ledgerReadBytes ?? limits.ledger_read_bytes),
+    ledgerWriteBytes: toNumber(limits.ledgerWriteBytes ?? limits.ledger_write_bytes),
+    ledgerReadEntries: toNumber(limits.ledgerReadEntries ?? limits.ledger_read_entries),
+    ledgerWriteEntries: toNumber(limits.ledgerWriteEntries ?? limits.ledger_write_entries),
+  };
+}
+
+function extractWasmSize(entry: unknown): number | null {
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const contractData = record.contractData as Record<string, unknown> | undefined;
+  const val = (contractData?.val ?? record.val) as Record<string, unknown> | undefined;
+  const executable = val?.executable as Record<string, unknown> | undefined;
+  const wasm = executable?.wasm as Record<string, unknown> | undefined;
+  const code = wasm?.code as unknown;
+  if (typeof code === "string") {
+    // Soroban returns the WASM code as a base64-encoded string.
+    try {
+      return Buffer.from(code, "base64").byteLength;
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(code)) return code.length;
+  return toNumber(wasm?.size ?? wasm?.byteLength);
+}
+
 export async function GET(req: Request, { params }: Params) {
   const limited = rateLimitRequest(req, { scope: "contract-info" });
   if (limited) return limited;
@@ -15,6 +72,18 @@ export async function GET(req: Request, { params }: Params) {
   if (!info) {
     return NextResponse.json({ error: "Contract not found or unreachable" }, { status: 404 });
   }
+
+  // Derive WASM size and declared resource limits from the getLedgerEntries response.
+  const ledgerEntries = (info as Record<string, unknown>).ledgerEntries;
+  const entries = Array.isArray(ledgerEntries) ? ledgerEntries : [];
+  let wasmSize: number | null = null;
+  let resourceLimits: ResourceLimits | null = null;
+  for (const entry of entries) {
+    if (wasmSize === null) wasmSize = extractWasmSize(entry);
+    if (resourceLimits === null) resourceLimits = extractResourceLimits(entry);
+    if (wasmSize !== null && resourceLimits !== null) break;
+  }
+
   // Gaps are ledger ranges the indexer skipped for every contract; the UI can flag them.
-  return NextResponse.json({ ...info, historyGaps });
+  return NextResponse.json({ ...info, historyGaps, wasmSize, resourceLimits });
 }

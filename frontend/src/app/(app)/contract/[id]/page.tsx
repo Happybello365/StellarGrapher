@@ -42,12 +42,20 @@ export default async function ContractPage({ params }: Props) {
   const rpcFallback = !isIndexerConfigured();
   const storageCount = fullStorage.length > 0 ? fullStorage.length : (info?.instanceStorage ?? []).length;
 
+  const wasmSizeKb = wasm?.sizeBytes != null ? wasm.sizeBytes / 1024 : null;
+  const resourceLimits = wasm?.resourceLimits ?? null;
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-1">Contract</h1>
       <div className="flex items-start gap-2 mb-8">
         <p className="text-prism-muted font-mono text-sm break-all">{contractId}</p>
         <CopyButton value={contractId} what="contract ID" />
+        {wasmSizeKb != null && (
+          <span className="ml-auto shrink-0 rounded bg-prism-surface px-2 py-1 text-xs font-mono text-prism-muted">
+            WASM: {wasmSizeKb.toFixed(2)} KB
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8">
@@ -55,6 +63,44 @@ export default async function ContractPage({ params }: Props) {
           <h2 className="text-lg font-semibold mb-3">Overview</h2>
           <ContractOverview info={info} wasm={wasm} />
         </section>
+
+        {resourceLimits && (
+          <section>
+            <details className="rounded border border-prism-border bg-prism-surface">
+              <summary className="cursor-pointer px-4 py-3 text-lg font-semibold">
+                Resource Limits
+              </summary>
+              <div className="px-4 pb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-prism-muted">
+                      <th className="py-1 pr-4 font-medium">Resource</th>
+                      <th className="py-1 font-medium">Declared Limit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono">
+                    <tr className="border-t border-prism-border">
+                      <td className="py-1 pr-4">CPU instructions</td>
+                      <td className="py-1">{resourceLimits.cpuInstructions.toLocaleString()}</td>
+                    </tr>
+                    <tr className="border-t border-prism-border">
+                      <td className="py-1 pr-4">Memory (bytes)</td>
+                      <td className="py-1">{resourceLimits.memoryBytes.toLocaleString()}</td>
+                    </tr>
+                    <tr className="border-t border-prism-border">
+                      <td className="py-1 pr-4">Ledger reads</td>
+                      <td className="py-1">{resourceLimits.ledgerReads.toLocaleString()}</td>
+                    </tr>
+                    <tr className="border-t border-prism-border">
+                      <td className="py-1 pr-4">Ledger writes</td>
+                      <td className="py-1">{resourceLimits.ledgerWrites.toLocaleString()}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </section>
+        )}
 
         {wasm && wasm.functions.length > 0 && (
           <section>
