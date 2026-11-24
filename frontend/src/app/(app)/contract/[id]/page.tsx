@@ -83,6 +83,7 @@ export default async function ContractPage({ params }: Props) {
             limit={INVOCATION_PAGE_SIZE}
             derivedFromEvents={rpcFallback}
             title="Recent Invocations"
+            exportCsv
           />
         </section>
 
